@@ -1,0 +1,17 @@
+
+[settings]
+os=Linux
+arch=x86_64
+
+[options]
+*:shared=True
+qt/*:shared=True
+qt/*:qt3d=False
+qt/*:qtquickcontrols2=True
+qt/*:qtserialport=True
+qt/*:qtgamepad=False
+qt/*:with_zstd=False
+
+[conf]
+tools.system.package_manager:mode=install
+tools.system.package_manager:sudo=true
