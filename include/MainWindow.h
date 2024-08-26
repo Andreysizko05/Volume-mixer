@@ -2,6 +2,11 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <Windows.h>
+#include <mmdeviceapi.h>
+#include <audiopolicy.h>
+#include <iostream>
+#include <psapi.h>  // for gettting name through path
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -19,5 +24,7 @@ public:
 
 private:
     Ui::MainWindow *ui;
+
+    std::wstring MainWindow::GetProcessName(DWORD processID);
 };
 #endif // MAINWINDOW_H
