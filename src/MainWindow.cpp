@@ -16,6 +16,21 @@ MainWindow::MainWindow(QWidget* parent)
     CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&deviceEnumerator));
     deviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultDevice);
 
+    // Get the overall system volume
+    IAudioEndpointVolume* endpointVolume = nullptr;
+    defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr, (void**)&endpointVolume);
+
+    float systemVolumeLevel = 0.0f;
+    if (endpointVolume != nullptr) {
+        endpointVolume->GetMasterVolumeLevelScalar(&systemVolumeLevel);
+    }
+
+    // Convert system volume level to percentage
+    int systemVolumePercentage = static_cast<int>(systemVolumeLevel * 100);
+
+    // Output the overall system volume
+    std::wcout << L"System Volume: " << systemVolumePercentage << L"%" << std::endl;
+
     // Get IAudioSessionManager2 for session management
     IAudioSessionManager2* sessionManager = nullptr;
     defaultDevice->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, (void**)&sessionManager);
@@ -78,6 +93,9 @@ MainWindow::MainWindow(QWidget* parent)
     // Clean up
     sessionEnumerator->Release();
     sessionManager->Release();
+    if (endpointVolume) {
+        endpointVolume->Release();
+    }
     defaultDevice->Release();
     deviceEnumerator->Release();
     CoUninitialize();

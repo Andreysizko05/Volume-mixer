@@ -7,6 +7,7 @@
 #include <audiopolicy.h>
 #include <iostream>
 #include <psapi.h>  // for gettting name through path
+#include <endpointvolume.h>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
