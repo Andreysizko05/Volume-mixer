@@ -17,7 +17,6 @@ MainWindow::MainWindow(QWidget* parent)
     deviceEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &defaultDevice);
 
     // Get the overall system volume
-    IAudioEndpointVolume* endpointVolume = nullptr;
     defaultDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr, (void**)&endpointVolume);
 
     float systemVolumeLevel = 0.0f;
@@ -32,7 +31,6 @@ MainWindow::MainWindow(QWidget* parent)
     std::wcout << L"System Volume: " << systemVolumePercentage << L"%" << std::endl;
 
     // Get IAudioSessionManager2 for session management
-    IAudioSessionManager2* sessionManager = nullptr;
     defaultDevice->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, (void**)&sessionManager);
 
     // Get the list of audio sessions
@@ -53,6 +51,7 @@ MainWindow::MainWindow(QWidget* parent)
         DWORD processId;
         sessionControl2->GetProcessId(&processId);
 
+        // Get the display name
         WCHAR* displayName = nullptr;
         sessionControl2->GetDisplayName(&displayName);
 
@@ -79,26 +78,44 @@ MainWindow::MainWindow(QWidget* parent)
         int volumePercentage = static_cast<int>(volumeLevel * 100);
 
         // Output the application name, process ID, and volume level
-        std::wcout << L"Application Name: " << appName
+        std::wcout << L"Application Name: " << GetFileNameFromPath(appName)
             << L" | Process ID: " << processId
             << L" | Volume: " << volumePercentage << L"%" << std::endl;
 
         if (displayName) {
             CoTaskMemFree(displayName);
         }
+
         sessionControl2->Release();
         sessionControl->Release();
     }
 
     // Clean up
     sessionEnumerator->Release();
-    sessionManager->Release();
+    SetSystemVolume(53);
+    SetApplicationVolume(L"steam.exe", 70);
+}
+
+
+
+
+
+
+
+
+
+
+MainWindow::~MainWindow()
+{
     if (endpointVolume) {
         endpointVolume->Release();
     }
-    defaultDevice->Release();
-    deviceEnumerator->Release();
+    if (sessionManager) {
+        sessionManager->Release();
+    }
     CoUninitialize();
+
+    delete ui;
 }
 
 std::wstring MainWindow::GetProcessName(DWORD processID) {
@@ -115,7 +132,77 @@ std::wstring MainWindow::GetProcessName(DWORD processID) {
     return processName;
 }
 
-MainWindow::~MainWindow()
+std::wstring MainWindow::GetFileNameFromPath(const std::wstring& path)
 {
-    delete ui;
+    size_t pos = path.find_last_of(L"\\/");
+    if (pos != std::wstring::npos) {
+        return path.substr(pos + 1);
+    }
+    return path;
+}
+
+void MainWindow::SetSystemVolume(int volumePercentage)
+{
+    if (endpointVolume) {
+        float volumeLevel = static_cast<float>(volumePercentage) / 100.0f;
+        endpointVolume->SetMasterVolumeLevelScalar(volumeLevel, nullptr);
+    }
+}
+
+void MainWindow::SetApplicationVolume(const std::wstring& appIdentifier, int volumePercentage)
+{
+    IAudioSessionEnumerator* sessionEnumerator = nullptr;
+    sessionManager->GetSessionEnumerator(&sessionEnumerator);
+
+    int sessionCount;
+    sessionEnumerator->GetCount(&sessionCount);
+
+    for (int i = 0; i < sessionCount; ++i) {
+        IAudioSessionControl* sessionControl = nullptr;
+        IAudioSessionControl2* sessionControl2 = nullptr;
+
+        sessionEnumerator->GetSession(i, &sessionControl);
+        sessionControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&sessionControl2);
+
+        DWORD processId;
+        sessionControl2->GetProcessId(&processId);
+
+        // Get the display name
+        WCHAR* displayName = nullptr;
+        sessionControl2->GetDisplayName(&displayName);
+
+        // Get the volume level for the session
+        ISimpleAudioVolume* audioVolume = nullptr;
+        sessionControl2->QueryInterface(__uuidof(ISimpleAudioVolume), (void**)&audioVolume);
+
+        // If the name is not available, use the process name
+        std::wstring appName;
+        if (displayName == nullptr || wcslen(displayName) == 0) {
+            appName = GetProcessName(processId);
+        }
+        else {
+            appName = displayName;
+        }
+
+        // If the process name or path matches the provided identifier
+        if (appName == appIdentifier || GetFileNameFromPath(appName) == appIdentifier) {
+            float volumeLevel = static_cast<float>(volumePercentage) / 100.0f;
+            if (audioVolume != nullptr) {
+                audioVolume->SetMasterVolume(volumeLevel, nullptr);
+            }
+            break;
+        }
+
+        // Clean up
+        if (audioVolume) {
+            audioVolume->Release();
+        }
+        if (displayName) {
+            CoTaskMemFree(displayName);
+        }
+        sessionControl2->Release();
+        sessionControl->Release();
+    }
+
+    sessionEnumerator->Release();
 }
